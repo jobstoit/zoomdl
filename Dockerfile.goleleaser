@@ -1,0 +1,4 @@
+## NOTE this Dockerfile is used in combination with goreleaser
+FROM alpine
+ENTRYPOINT ["/usr/bin/zoomdl"]
+COPY zoomdl /usr/bin/zoomdl

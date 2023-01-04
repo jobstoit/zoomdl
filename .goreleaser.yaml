@@ -1,0 +1,62 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=0
+    binary: zoomdl
+    goos:
+      - windows
+      - darwin
+      - linux
+dockers:
+  - image_templates:
+      - "{{ .Env.REGISTRY }}:{{ .Version }}-amd64"
+      - "{{ .Env.REGISTRY }}:latest-amd64"
+    use: buildx
+    goarch: amd64
+    dockerfile: Dockerfile.goreleaser
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  - image_templates:
+      - "{{ .Env.REGISTRY }}:{{ .Version }}-arm64"
+      - "{{ .Env.REGISTRY }}:latest-arm64"
+    use: buildx
+    goarch: arm64
+    dockerfile: Dockerfile.goreleaser
+    build_flag_templates:
+      - "--platform=linux/arm64/v8"
+docker_manifests:
+  - name_template: "{{ .Env.REGISTRY }}:{{ .Version }}"
+    image_templates:
+      - "{{ .Env.REGISTRY }}:{{ .Version }}-amd64"
+      - "{{ .Env.REGISTRY }}:{{ .Version }}-arm64"
+  - name_template: "{{ .Env.REGISTRY }}:latest"
+    image_templates:
+      - "{{ .Env.REGISTRY }}:latest-amd64"
+      - "{{ .Env.REGISTRY }}:latest-arm64"
+archives:
+  - replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      386: i386
+      amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+release:
+  header: |
+    ## ZoomDL release {{ .Tag }}
+
+    Pull the container images from {{ .Env.REGISTRY }}:{{ .Version }}
+    ```sh
+    $ docker pull {{ .Env.REGISTRY }}:{{ .Version }}
+    ```
