@@ -208,8 +208,7 @@ func (z *ZoomClient) DeleteRecording(id string) error {
 // DownloadVideo downloads the video to the given file and returns the path
 func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (string, error) {
 	log.Printf("Downloading %s from %v", sessionTitle, rec.RecordingStart)
-	recordingTime := rec.RecordingStart.Local()
-	tz, _ := recordingTime.Zone()
+	recordingTime := rec.RecordingStart
 
 	sessionTitle = serializPathString(sessionTitle)
 	fileExtention := ""
@@ -222,8 +221,7 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 		fileExtention = "mp4"
 	}
 
-	filepath := path.Join(z.config.Directory, sessionTitle, fmt.Sprintf("%s%04d%02d%02d-%02d%02d%02d_%s.%s",
-		tz,
+	filepath := path.Join(z.config.Directory, sessionTitle, fmt.Sprintf("%04d-%02d-%02d_%02d-%02d-%02d_%s.%s",
 		rec.RecordingStart.Year(),
 		int(recordingTime.Month()),
 		recordingTime.Day(),
@@ -288,7 +286,7 @@ func (z *ZoomClient) Sweep() error {
 	ignoredTitles := strings.Join(z.config.IgnoreTitles, " ")
 
 	for _, meeting := range meetings {
-		if strings.Contains(ignoredTitles, meeting.Topic) {
+		if ignoredTitles != "" && strings.Contains(ignoredTitles, meeting.Topic) {
 			break
 		}
 
