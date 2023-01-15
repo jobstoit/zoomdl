@@ -57,6 +57,7 @@ type Meeting struct {
 	UUID           string          `json:"uuid"`
 	Topic          string          `json:"topic"`
 	RecordingFiles []RecordingFile `json:"recording_files"`
+	StartTime      time.Time       `json:"-"`
 }
 
 // RecordingFile describes the
@@ -93,12 +94,7 @@ func NewZoomClient(cfg *Config) *ZoomClient {
 	z := &ZoomClient{}
 	z.config = cfg
 	z.cli = &http.Client{}
-
-	apiURL, err := url.Parse(cfg.APIEndpoint)
-	if err != nil {
-		panic(err)
-	}
-	z.BaseURL = apiURL
+	z.BaseURL = z.config.APIEndpoint
 
 	return z
 }
@@ -111,7 +107,8 @@ func (z *ZoomClient) Authorize() (*AccessToken, error) {
 	formData.Add(`grant_type`, `account_credentials`)
 	formData.Add(`account_id`, z.config.UserID)
 
-	req, err := http.NewRequest(http.MethodPost, `https://zoom.us/oauth/token`, strings.NewReader(formData.Encode()))
+	endpointURL := z.config.AuthEndpoint.JoinPath("oauth/token").String()
+	req, err := http.NewRequest(http.MethodPost, endpointURL, strings.NewReader(formData.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -148,23 +145,22 @@ func (z *ZoomClient) Authorize() (*AccessToken, error) {
 func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 	meetings := []Meeting{}
 
-	url := z.BaseURL.String() + "/v2/users/me/recordings"
+	endpointURL := z.BaseURL.JoinPath("users/me/recordings")
 
-	to := time.Now()
-	from := to.AddDate(0, -2, 0)
-	until := time.Date(z.config.StartingFromYear, 1, 1, 0, 0, 0, 0, time.Local)
-	for {
+	now := time.Now()
+	from := time.Date(z.config.StartingFromYear, 1, 1, 0, 0, 0, 0, time.Local)
+	for d := from; !d.After(now); d = d.AddDate(0, 1, 0) {
+		to := d.AddDate(0, 1, 0)
+
 		resp := ListAllRecordsResponse{}
-		urlNext := fmt.Sprintf("%s?page_size=300&from=%04d-%02d-%02d&to=%04d-%02d-%02d",
-			url,
-			from.Year(),
-			int(from.Month()),
-			from.Day(),
-			to.Year(),
-			int(to.Month()),
-			to.Day(),
-		)
-		res, err := z.do(http.MethodGet, urlNext, nil)
+
+		query := endpointURL.Query()
+		query.Set("page_size", "300")
+		query.Set("from", fmt.Sprintf("%04d-%02d-%02d", d.Year(), int(d.Month()), d.Day()))
+		query.Set("to", fmt.Sprintf("%04d-%02d-%02d", to.Year(), int(to.Month()), to.Day()))
+		endpointURL.RawQuery = query.Encode()
+
+		res, err := z.do(http.MethodGet, endpointURL.String(), nil)
 		if err != nil {
 			return meetings, err
 		}
@@ -181,21 +177,31 @@ func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 		}
 
 		meetings = append(meetings, resp.Meetings...)
-
-		if from.Before(until) {
-			break
-		}
-
-		to = to.AddDate(0, -1, 0)
-		from = from.AddDate(0, -1, 0)
 	}
+
+	meetings = clearDuplicateMeetings(meetings)
 
 	return meetings, nil
 }
 
+func clearDuplicateMeetings(ms []Meeting) []Meeting {
+	keys := map[string]bool{}
+	list := []Meeting{}
+
+	for _, m := range ms {
+		if _, exists := keys[m.UUID]; !exists {
+			keys[m.UUID] = true
+			list = append(list, m)
+		}
+	}
+
+	return list
+}
+
 // DeleteRecording deletes the recording on zoom
 func (z *ZoomClient) DeleteRecording(id string) error {
-	url := z.BaseURL.String() + "v2/meetings/" + id + "/recordings?page_size=300"
+	url := z.BaseURL.JoinPath("meetings", id, "recordings").String()
+
 	res, err := z.do(http.MethodDelete, url, &bytes.Buffer{})
 	if err != nil {
 		return err
@@ -207,19 +213,10 @@ func (z *ZoomClient) DeleteRecording(id string) error {
 
 // DownloadVideo downloads the video to the given file and returns the path
 func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (string, error) {
-	log.Printf("Downloading %s from %v", sessionTitle, rec.RecordingStart)
 	recordingTime := rec.RecordingStart
 
 	sessionTitle = serializPathString(sessionTitle)
-	fileExtention := ""
-	switch rec.FileType {
-	case FileTypeCSV, FileTypeChat, FileTypeTimeline, FileTypeTranscript, FileTypeCC:
-		fileExtention = "txt"
-	case FileTypeMPA:
-		fileExtention = "mp4a"
-	default:
-		fileExtention = "mp4"
-	}
+	fileExtention := fileExtention(rec.FileType)
 
 	filepath := path.Join(z.config.Directory, sessionTitle, fmt.Sprintf("%04d-%02d-%02d_%02d-%02d-%02d_%s.%s",
 		rec.RecordingStart.Year(),
@@ -287,13 +284,13 @@ func (z *ZoomClient) Sweep() error {
 
 	for _, meeting := range meetings {
 		if ignoredTitles != "" && strings.Contains(ignoredTitles, meeting.Topic) {
-			break
+			continue
 		}
 
 		for _, rf := range meeting.RecordingFiles {
 			if strings.Contains(recordIDs, rf.ID) ||
 				!strings.Contains(allowedTypes, string(rf.RecordingType)) {
-				break
+				continue
 			}
 
 			log.Printf("Downloading '%s' from %v of type %s", meeting.Topic, rf.RecordingStart, rf.RecordingType)
@@ -381,4 +378,15 @@ func getRecordMap(records []SavedRecord) string {
 	}
 
 	return s
+}
+
+func fileExtention(fileType FileType) string {
+	switch fileType {
+	case FileTypeCSV, FileTypeChat, FileTypeTimeline, FileTypeTranscript, FileTypeCC:
+		return "txt"
+	case FileTypeMPA:
+		return "mp4a"
+	default:
+		return "mp4"
+	}
 }
