@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/url"
 	"os"
 	"path"
 	"strconv"
@@ -22,11 +23,11 @@ type Config struct {
 	Duration         time.Duration
 	Directory        string
 	Token            string
-	APIEndpoint      string
+	APIEndpoint      *url.URL
+	AuthEndpoint     *url.URL
 	UserID           string
 	ClientID         string
 	ClientSecret     string
-	AccountID        string
 	StartingFromYear int
 }
 
@@ -42,17 +43,9 @@ type SavedRecord struct {
 
 func main() {
 	config := NewConfig()
-
 	zc := NewZoomClient(config)
 
-	savedPath := path.Join(zc.config.Directory, SavedRecordFileName)
-	if _, err := os.Stat(savedPath); os.IsNotExist(err) {
-		file, err := os.Create(savedPath)
-		if err != nil {
-			log.Fatal(`error creating save file`)
-		}
-		_ = file.Close()
-	}
+	createSaveFile(zc.config.Directory)
 
 	log.Printf("starting service with allowed recording types %v and ignored titles %v", config.RecordingTypes, config.IgnoreTitles)
 	for {
@@ -64,67 +57,94 @@ func main() {
 	}
 }
 
+func createSaveFile(dir string) {
+	_ = os.MkdirAll(dir, os.ModePerm)
+
+	p := path.Join(dir, SavedRecordFileName)
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		file, err := os.Create(p)
+		if err != nil {
+			log.Fatal("error creating save file")
+		}
+		_ = file.Close()
+	}
+
+}
+
 // NewConfig returns a new initialized config
 func NewConfig() *Config {
 	c := &Config{}
-	envDur := os.Getenv(`ZOOMDL_DURATION`)
-	if envDur == `` {
-		envDur = `30m`
-	}
 
-	dur, err := time.ParseDuration(envDur)
-	if err != nil {
-		log.Fatalf("error parsing duration format %s: %v", envDur, err)
-	}
-	c.Duration = dur
+	c.RecordingTypes = strings.Split(os.Getenv("ZOOMDL_RECORDING_TYPES"), ";")
+	c.IgnoreTitles = strings.Split(os.Getenv("ZOOMDL_IGNORE_TITLES"), ";")
 
-	c.RecordingTypes = strings.Split(os.Getenv(`ZOOMDL_RECORDING_TYPES`), ";")
-	c.IgnoreTitles = strings.Split(os.Getenv(`ZOOMDL_IGNORE_TITLES`), ";")
+	c.Directory = envDefault("ZOOMDL_DIR", "/")
 
-	c.UserID = os.Getenv(`ZOOMDL_USER_ID`)
-	if c.UserID == `` {
-		log.Fatal(`missing required user id`)
-	}
+	c.UserID = envRequired("ZOOMDL_USER_ID")
+	c.ClientID = envRequired("ZOOMDL_CLIENT_ID")
+	c.ClientSecret = envRequired("ZOOMDL_CLIENT_SECRET")
 
-	c.ClientID = os.Getenv(`ZOOMDL_CLIENT_ID`)
-	if c.ClientID == `` {
-		log.Fatal(`missing required client id`)
-	}
+	c.APIEndpoint = envURL("ZOOMDL_API_ENDPOINT", ZoomAPIEndpoint)
+	c.AuthEndpoint = envURL("ZOOMDL_AUTH_ENDPOINT", "https://zoom.us")
+	c.StartingFromYear = envInt("ZOOMDL_START_YEAR", 2018)
 
-	c.ClientSecret = os.Getenv(`ZOOMDL_CLIENT_SECRET`)
-	if c.ClientSecret == `` {
-		log.Fatal(`missing required client secret`)
-	}
-
-	c.DeleteAfter = os.Getenv(`ZOOMDL_DELETE_AFTER`) == `true`
-
-	c.Directory = os.Getenv(`ZOOMDL_DIR`)
-	if c.Directory == `` {
-		c.Directory = `/`
-	}
-
-	c.APIEndpoint = os.Getenv(`ZOOMDL_API_ENDPOINT`)
-	if c.APIEndpoint == `` {
-		c.APIEndpoint = `https://api.zoom.us`
-	}
-
-	c.AccountID = os.Getenv(`ZOOMDL_ACCOUNT_ID`)
-	if c.AccountID == `` {
-		log.Fatal(`missing required account id`)
-	}
-
-	year := 2018
-	syear := os.Getenv(`ZOOMDL_START_YEAR`)
-	if syear != `` {
-		y, err := strconv.Atoi(syear)
-		if err != nil {
-			log.Print(`error parsing year`)
-		} else {
-			year = y
-		}
-	}
-	c.StartingFromYear = year
+	c.Duration = envDuration("ZOOMDL_DURATION", "30m")
+	c.DeleteAfter = os.Getenv("ZOOMDL_DELETE_AFTER") == "true"
 
 	return c
+}
 
+func envRequired(env string) string {
+	val := os.Getenv(env)
+	if val == "" {
+		log.Fatalf("missing required environment variable '%s'", env)
+	}
+
+	return val
+}
+
+func envDefault(env, defaultStr string) string {
+	val := os.Getenv(env)
+	if val == "" {
+		return defaultStr
+	}
+
+	return val
+}
+
+func envDuration(env, defaultDuration string) time.Duration {
+	val := envDefault(env, defaultDuration)
+
+	dur, err := time.ParseDuration(val)
+	if err != nil {
+		log.Fatalf("error parsing %s with value '%s': %v", env, val, err)
+	}
+
+	return dur
+}
+
+func envURL(env, defaultURL string) *url.URL {
+	val := envDefault(env, defaultURL)
+
+	u, err := url.Parse(val)
+	if err != nil {
+		log.Fatalf("error parsing for '%s' url '%s': %v", val, env, err)
+	}
+
+	return u
+}
+
+func envInt(env string, defaultInt int) int {
+	val := os.Getenv(env)
+	if val == "" {
+		return defaultInt
+	}
+
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		log.Printf("error parsing for '%s' int '%s' (now using default): %v", val, env, err)
+		return defaultInt
+	}
+
+	return i
 }
