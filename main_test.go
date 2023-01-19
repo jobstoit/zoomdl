@@ -61,6 +61,7 @@ func (z *ZoomMockAPI) Seed() {
 		createMeeting(z.baseURL, `static`, 1003, time.Date(2022, time.December, 1, 0, 0, 0, 0, time.UTC), RecordingTypeGallery, RecordingTypeActiveSpeaker),
 		createMeeting(z.baseURL, `static2`, 1004, time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC), RecordingTypeGallery, RecordingTypeActiveSpeaker),
 		createMeeting(z.baseURL, `ignore`, 1005, time.Date(2023, time.January, 2, 0, 0, 0, 0, time.UTC), RecordingTypeGallery, RecordingTypeActiveSpeaker),
+		createMeeting(z.baseURL, `ignore`, 1005, time.Date(2023, time.January, 2, 0, 0, 0, 0, time.UTC), RecordingTypeGallery, RecordingTypeActiveSpeaker),
 	}
 
 	for i := 0; i < 10; i++ {
@@ -76,6 +77,7 @@ func (z *ZoomMockAPI) ServeHTTP(wr http.ResponseWriter, r *http.Request) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/users/me/recordings", z.listAllRecordings)
 	mux.HandleFunc("/oauth/token", z.authorize)
+	mux.HandleFunc("/meetings/1001/recordings", z.deleteMeeting)
 
 	if strings.HasPrefix(r.URL.Path, "/files") {
 		z.download(wr, r)
@@ -141,6 +143,28 @@ func (z *ZoomMockAPI) download(wr http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(wr, "some random file")
 }
 
+func (z *ZoomMockAPI) deleteMeeting(wr http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		wr.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	found := false
+	for i := len(z.meetings) - 1; i > -1; i-- {
+		if z.meetings[i].UUID == "1001" {
+			z.meetings = append(z.meetings[:i], z.meetings[i+1:]...)
+			found = true
+		}
+	}
+
+	if !found {
+		wr.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	wr.WriteHeader(http.StatusOK)
+}
+
 func createRandomMeeting(baseURL *url.URL, topic string, id int, from time.Time) Meeting {
 	recordedAt := randdate(from, time.Now())
 	recordingTypes := []RecordingType{}
@@ -155,7 +179,7 @@ func createMeeting(baseURL *url.URL, topic string, id int, startTime time.Time, 
 	m := Meeting{
 		ID:        id,
 		Topic:     topic,
-		UUID:      randomString(25),
+		UUID:      fmt.Sprintf("%d", id),
 		StartTime: startTime,
 	}
 
@@ -222,14 +246,9 @@ func randomRecordingType() RecordingType {
 	}
 }
 
-func eq[T int | string | bool | RecordingType](t *testing.T, expected, actual T) {
-	if expected != actual {
-		t.Errorf("expected %v but got %v", expected, actual)
-	}
-}
-
-func unexpectError(t *testing.T, err error) {
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+func assert(t *testing.T, condition bool, explaination ...string) {
+	if !condition {
+		explaination = append([]string{"assertion failed:"}, explaination...)
+		t.Error(strings.Join(explaination, " "))
 	}
 }

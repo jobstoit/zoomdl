@@ -186,16 +186,18 @@ func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 
 func clearDuplicateMeetings(ms []Meeting) []Meeting {
 	keys := map[string]bool{}
-	list := []Meeting{}
 
-	for _, m := range ms {
-		if _, exists := keys[m.UUID]; !exists {
-			keys[m.UUID] = true
-			list = append(list, m)
+	for i := len(ms) - 1; i >= 0; i-- {
+		m := ms[i]
+		if _, exists := keys[m.UUID]; exists {
+			ms = append(ms[:i], ms[i+1:]...)
+			continue
 		}
+
+		keys[m.UUID] = true
 	}
 
-	return list
+	return ms
 }
 
 // DeleteRecording deletes the recording on zoom

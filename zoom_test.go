@@ -1,12 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path"
 	"testing"
-	"text/tabwriter"
 	"time"
 )
 
@@ -17,39 +15,24 @@ func TestListAllRecordings(t *testing.T) {
 	c.config.StartingFromYear = 2017
 
 	meetings, err := c.ListAllRecordings()
-	if err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-	}
-
-	if len(meetings) < 1 {
-		t.Errorf("missing expected recordings")
-	}
+	assert(t, err == nil, "unexpected error listing recordings")
+	assert(t, len(meetings) > 1, "missing expected recordings")
 
 	for _, meeting := range meetings {
 		switch meeting.ID {
 		case 1001:
-			eq(t, "static", meeting.Topic)
-			eq(t, 4, len(meeting.RecordingFiles))
+			assert(t, meeting.Topic == "static", "meeting topic must me static")
+			assert(t, len(meeting.RecordingFiles) == 4, "meeting must have 4 recording files")
 			if len(meeting.RecordingFiles) != 4 {
-				break
+				continue
 			}
 
 			rf := meeting.RecordingFiles[0]
-			eq(t, RecordingTypeAudioOnly, rf.RecordingType)
+			assert(t, rf.RecordingType == RecordingTypeAudioOnly, "meeting recording type must be of type audio_only")
 		}
 	}
 
-	eq(t, 15, len(meetings))
-
-	if t.Failed() {
-		wr := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight|tabwriter.Debug)
-		fmt.Fprintln(wr, "topic\tdate\trecording count")
-		for _, meeting := range meetings {
-			fmt.Fprintf(wr, "%s\t%v\t%d\n", meeting.Topic, meeting.StartTime, len(meeting.RecordingFiles))
-		}
-
-		wr.Flush()
-	}
+	assert(t, len(meetings) == 15, "expect 15 recordings")
 }
 
 func TestDownload(t *testing.T) {
@@ -64,12 +47,17 @@ func TestDownload(t *testing.T) {
 		DownloadURL:    c.config.APIEndpoint.JoinPath("files/123").String(),
 	})
 
-	unexpectError(t, err)
-	eq(t, path.Join(c.config.Directory, "/static/2018-01-01_00-00-00_active_speaker.mp4"), fpath)
+	assert(t, err == nil, "error must be nil")
+	assert(t,
+		path.Join(c.config.Directory, "/static/2018-01-01_00-00-00_active_speaker.mp4") == fpath,
+		"path must be equal",
+	)
 
 	stat, err := os.Stat(fpath)
-	eq(t, false, err == os.ErrNotExist)
-	eq(t, true, stat.Size() > 0)
+	assert(t, err == nil, "getting file stat error must be nil")
+	if stat != nil {
+		assert(t, stat.Size() > 0, "downloaded filesize must be bigger than zero")
+	}
 }
 
 func TestSweep(t *testing.T) {
@@ -80,13 +68,21 @@ func TestSweep(t *testing.T) {
 	c.config.IgnoreTitles = []string{"ignore"}
 	c.config.StartingFromYear = 2022
 
-	unexpectError(t, c.Sweep())
+	assert(t, c.Sweep() == nil, "sweep error mustbe nil")
 
 	assertFileExists(t, path.Join(c.config.Directory, "static/2022-10-01_00-00-00_gallery_view.mp4"))
 	assertFileExists(t, path.Join(c.config.Directory, "static/2022-10-01_00-00-00_active_speaker.mp4"))
 	assertFileExists(t, path.Join(c.config.Directory, "static/2022-11-01_00-00-00_active_speaker.mp4"))
 	assertFileExists(t, path.Join(c.config.Directory, "static/2022-11-01_00-00-00_gallery_view.mp4"))
 	assertFileExists(t, path.Join(c.config.Directory, "static2/2023-01-01_00-00-00_active_speaker.mp4"))
+}
+
+func TestDeleteRecording(t *testing.T) {
+	c := SetupTest("tmp_test_delete")
+	defer os.RemoveAll(c.config.Directory)
+
+	assert(t, c.DeleteRecording("1001") == nil, "deletion doesnt return an error")
+	assert(t, c.DeleteRecording("1001") != nil, "deletion returns an error")
 }
 
 func assertFileExists(t *testing.T, fpath string) {
