@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	ZoomAPIEndpoint     = "https://api.zoom.us/v2"
 	SavedRecordFileName = ".zoomdl_saved_records.json"
 )
 
@@ -84,7 +83,7 @@ func NewConfig() *Config {
 	c.ClientID = envRequired("ZOOMDL_CLIENT_ID")
 	c.ClientSecret = envRequired("ZOOMDL_CLIENT_SECRET")
 
-	c.APIEndpoint = envURL("ZOOMDL_API_ENDPOINT", ZoomAPIEndpoint)
+	c.APIEndpoint = envURL("ZOOMDL_API_ENDPOINT", "https://api.zoom.us/v2")
 	c.AuthEndpoint = envURL("ZOOMDL_AUTH_ENDPOINT", "https://zoom.us")
 	c.StartingFromYear = envInt("ZOOMDL_START_YEAR", 2018)
 
