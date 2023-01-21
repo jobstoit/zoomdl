@@ -42,7 +42,7 @@ func TestDownload(t *testing.T) {
 	fpath, err := c.DownloadVideo("static", RecordingFile{
 		RecordingType:  RecordingTypeActiveSpeaker,
 		RecordingStart: time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC),
-		FileExtention:  "MP4",
+		FileExtension:  "MP4",
 		DownloadURL:    c.config.APIEndpoint.JoinPath("files/123").String(),
 	})
 

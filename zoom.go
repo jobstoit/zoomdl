@@ -57,7 +57,7 @@ type RecordingFile struct {
 	ID             string        `json:"id"`
 	RecordingType  RecordingType `json:"recording_type"`
 	RecordingStart time.Time     `json:"recording_start"`
-	FileExtention  string        `json:"file_extention"`
+	FileExtension  string        `json:"file_extension"`
 	DownloadURL    string        `json:"download_url"`
 }
 
@@ -223,7 +223,7 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 	recordingTime := rec.RecordingStart
 
 	sessionTitle = serializPathString(sessionTitle)
-	fileExtention := strings.ToLower(rec.FileExtention)
+	fileExtention := strings.ToLower(rec.FileExtension)
 
 	filepath := path.Join(z.config.Directory, sessionTitle, fmt.Sprintf("%04d-%02d-%02d_%02d-%02d-%02d_%s.%s",
 		rec.RecordingStart.Year(),

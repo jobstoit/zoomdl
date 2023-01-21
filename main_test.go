@@ -190,7 +190,7 @@ func createMeeting(baseURL *url.URL, topic string, id int, startTime time.Time, 
 			RecordingStart: startTime,
 			DownloadURL:    baseURL.JoinPath("files", id).String(),
 			RecordingType:  typ,
-			FileExtention:  getFileExtention(typ),
+			FileExtension:  getFileExtention(typ),
 		})
 	}
 
