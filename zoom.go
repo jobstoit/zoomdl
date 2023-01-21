@@ -16,14 +16,6 @@ import (
 )
 
 const (
-	FileTypeMP4        FileType = "MP4"
-	FileTypeMPA        FileType = "MPA"
-	FileTypeTimeline   FileType = "TIMELINE"
-	FileTypeTranscript FileType = "TRANSCRIPT"
-	FileTypeChat       FileType = "CHAT"
-	FileTypeCC         FileType = "CC"
-	FileTypeCSV        FileType = "CSV"
-
 	RecordingTypeScharedScreenWithSpeakerCC RecordingType = "shared_screen_with_speaker_view(CC)"
 	RecordingTypeScharedScreenWithSpeaker   RecordingType = "shared_screen_with_speaker_view"
 	RecordingTypeScharedScreenWithGallery   RecordingType = "shared_screen_with_gallery_view"
@@ -63,11 +55,10 @@ type Meeting struct {
 // RecordingFile describes the
 type RecordingFile struct {
 	ID             string        `json:"id"`
-	FileType       FileType      `json:"file_type"`
 	RecordingType  RecordingType `json:"recording_type"`
 	RecordingStart time.Time     `json:"recording_start"`
-	FileExtention  string
-	DownloadURL    string `json:"download_url"`
+	FileExtension  string        `json:"file_extension"`
+	DownloadURL    string        `json:"download_url"`
 }
 
 // ZoomClient handles transactions with the zoom Video SDK API v2.0.0
@@ -152,36 +143,50 @@ func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 	for d := from; !d.After(now); d = d.AddDate(0, 1, 0) {
 		to := d.AddDate(0, 1, 0)
 
-		resp := ListAllRecordsResponse{}
-
 		query := endpointURL.Query()
 		query.Set("page_size", "300")
 		query.Set("from", fmt.Sprintf("%04d-%02d-%02d", d.Year(), int(d.Month()), d.Day()))
 		query.Set("to", fmt.Sprintf("%04d-%02d-%02d", to.Year(), int(to.Month()), to.Day()))
+
+		for {
+			m, err := z.getMeeting(endpointURL, query)
+			if err != nil {
+				return meetings, err
+			}
+
+			meetings = append(meetings, m.Meetings...)
+			if m.NextPageToken == "" {
+				break
+			}
+
+			query.Set("next_page_token", m.NextPageToken)
+		}
+
+		query.Del("next_page_token")
 		endpointURL.RawQuery = query.Encode()
-
-		res, err := z.do(http.MethodGet, endpointURL.String(), nil)
-		if err != nil {
-			return meetings, err
-		}
-		defer res.Body.Close() //nolint: errcheck
-
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			return meetings, err
-		}
-
-		if err := json.Unmarshal(body, &resp); err != nil {
-			log.Printf("error parsing json: %s", body)
-			return meetings, err
-		}
-
-		meetings = append(meetings, resp.Meetings...)
 	}
 
 	meetings = clearDuplicateMeetings(meetings)
 
 	return meetings, nil
+}
+
+func (z *ZoomClient) getMeeting(endpoint *url.URL, queries url.Values) (ListAllRecordsResponse, error) {
+	r := ListAllRecordsResponse{}
+	endpoint.RawQuery = queries.Encode()
+
+	res, err := z.do(http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return r, err
+	}
+	defer res.Body.Close()
+
+	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
+		log.Printf("error decoding listRecordings body: %s", res.Body)
+		return r, err
+	}
+
+	return r, nil
 }
 
 func clearDuplicateMeetings(ms []Meeting) []Meeting {
@@ -218,7 +223,7 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 	recordingTime := rec.RecordingStart
 
 	sessionTitle = serializPathString(sessionTitle)
-	fileExtention := fileExtention(rec.FileType)
+	fileExtention := strings.ToLower(rec.FileExtension)
 
 	filepath := path.Join(z.config.Directory, sessionTitle, fmt.Sprintf("%04d-%02d-%02d_%02d-%02d-%02d_%s.%s",
 		rec.RecordingStart.Year(),
@@ -380,15 +385,4 @@ func getRecordMap(records []SavedRecord) string {
 	}
 
 	return s
-}
-
-func fileExtention(fileType FileType) string {
-	switch fileType {
-	case FileTypeCSV, FileTypeChat, FileTypeTimeline, FileTypeTranscript, FileTypeCC:
-		return "txt"
-	case FileTypeMPA:
-		return "mp4a"
-	default:
-		return "mp4"
-	}
 }

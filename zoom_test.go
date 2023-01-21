@@ -40,10 +40,9 @@ func TestDownload(t *testing.T) {
 	defer os.RemoveAll(c.config.Directory) //nolint: errcheck
 
 	fpath, err := c.DownloadVideo("static", RecordingFile{
-		FileType:       FileTypeMP4,
 		RecordingType:  RecordingTypeActiveSpeaker,
 		RecordingStart: time.Date(2018, time.January, 1, 0, 0, 0, 0, time.UTC),
-		FileExtention:  string(FileTypeMP4),
+		FileExtension:  "MP4",
 		DownloadURL:    c.config.APIEndpoint.JoinPath("files/123").String(),
 	})
 

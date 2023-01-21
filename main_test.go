@@ -185,30 +185,28 @@ func createMeeting(baseURL *url.URL, topic string, id int, startTime time.Time, 
 
 	for _, typ := range recordingTypes {
 		id := randomString(15)
-		ft := getFileType(typ)
 		m.RecordingFiles = append(m.RecordingFiles, RecordingFile{
 			ID:             id,
 			RecordingStart: startTime,
 			DownloadURL:    baseURL.JoinPath("files", id).String(),
 			RecordingType:  typ,
-			FileExtention:  string(ft),
-			FileType:       ft,
+			FileExtension:  getFileExtention(typ),
 		})
 	}
 
 	return m
 }
 
-func getFileType(rt RecordingType) FileType {
+func getFileExtention(rt RecordingType) string {
 	switch rt {
 	case RecordingTypeAudioTranscript, RecordingTypeTimeline, RecordingTypePoll:
-		return FileTypeCSV
+		return "CSV"
 	case RecordingTypeChat:
-		return FileTypeChat
+		return "TXT"
 	case RecordingTypeAudioOnly:
-		return FileTypeMPA
+		return "MP4A"
 	default:
-		return FileTypeMP4
+		return "MP4"
 	}
 }
 
