@@ -28,6 +28,8 @@ func SetupTest(dir string) *ZoomClient {
 		APIEndpoint:  endpointURL,
 		AuthEndpoint: endpointURL,
 		Directory:    dir,
+		Concurrency:  2,
+		ChunckSizeMB: 4,
 	})
 }
 
@@ -140,6 +142,13 @@ func (z *ZoomMockAPI) authorize(wr http.ResponseWriter, r *http.Request) {
 }
 
 func (z *ZoomMockAPI) download(wr http.ResponseWriter, r *http.Request) {
+	wr.Header().Add("Content-Length", "16")
+
+	if r.Method == http.MethodHead {
+		wr.WriteHeader(http.StatusOK)
+		return
+	}
+
 	fmt.Fprint(wr, "some random file")
 }
 

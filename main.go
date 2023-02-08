@@ -27,6 +27,8 @@ type Config struct {
 	UserID           string
 	ClientID         string
 	ClientSecret     string
+	Concurrency      int
+	ChunckSizeMB     int
 	StartingFromYear int
 }
 
@@ -86,6 +88,8 @@ func NewConfig() *Config {
 	c.APIEndpoint = envURL("ZOOMDL_API_ENDPOINT", "https://api.zoom.us/v2")
 	c.AuthEndpoint = envURL("ZOOMDL_AUTH_ENDPOINT", "https://zoom.us")
 	c.StartingFromYear = envInt("ZOOMDL_START_YEAR", 2018)
+	c.Concurrency = envInt("ZOOMDL_CONCURRENCY", 4)
+	c.ChunckSizeMB = envInt("ZOOMDL_CHUNKSIZE_MB", 256)
 
 	c.Duration = envDuration("ZOOMDL_DURATION", "30m")
 	c.DeleteAfter = os.Getenv("ZOOMDL_DELETE_AFTER") == "true"
