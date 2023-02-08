@@ -69,6 +69,15 @@ type ZoomClient struct {
 	config  *Config
 	cli     *http.Client
 	token   *AccessToken
+	mut     chan bool
+}
+
+func (z *ZoomClient) lock() {
+	z.mut <- true
+}
+
+func (z *ZoomClient) unlock() {
+	<-z.mut
 }
 
 type AccessToken struct {
@@ -87,12 +96,16 @@ func NewZoomClient(cfg *Config) *ZoomClient {
 	z.config = cfg
 	z.cli = &http.Client{}
 	z.BaseURL = z.config.APIEndpoint
+	z.mut = make(chan bool, cfg.Concurrency)
 
 	return z
 }
 
 // Authorize
 func (z *ZoomClient) Authorize() (*AccessToken, error) {
+	z.lock()
+	defer z.unlock()
+
 	a := &AccessToken{}
 
 	formData := url.Values{}
@@ -135,41 +148,82 @@ func (z *ZoomClient) Authorize() (*AccessToken, error) {
 
 // ListAllRecordings returns all recordings
 func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
+	if z.token == nil || time.Now().After(z.token.ExpiresAt) {
+		at, err := z.Authorize()
+		if err != nil {
+			return nil, err
+		}
+		z.token = at
+	}
+
 	meetings := []Meeting{}
 
+	ch := make(chan meetingsChan)
+	count := 0
+
 	endpointURL := z.BaseURL.JoinPath("users/me/recordings")
-
-	now := time.Now()
 	from := time.Date(z.config.StartingFromYear, 1, 1, 0, 0, 0, 0, time.Local)
+	now := time.Now()
 	for d := from; !d.After(now); d = d.AddDate(0, 1, 0) {
-		to := d.AddDate(0, 1, 0)
+		go z.getMeetings(ch, endpointURL, d)
+		count++
+	}
 
-		query := endpointURL.Query()
-		query.Set("page_size", "300")
-		query.Set("from", fmt.Sprintf("%04d-%02d-%02d", d.Year(), int(d.Month()), d.Day()))
-		query.Set("to", fmt.Sprintf("%04d-%02d-%02d", to.Year(), int(to.Month()), to.Day()))
-
-		for {
-			m, err := z.getMeeting(endpointURL, query)
-			if err != nil {
-				return meetings, err
-			}
-
-			meetings = append(meetings, m.Meetings...)
-			if m.NextPageToken == "" {
-				break
-			}
-
-			query.Set("next_page_token", m.NextPageToken)
+	for i := 0; i < count; i++ {
+		res := <-ch
+		if res.err != nil {
+			return meetings, res.err
 		}
 
-		query.Del("next_page_token")
-		endpointURL.RawQuery = query.Encode()
+		meetings = append(meetings, res.meetings...)
 	}
+
+	close(ch)
 
 	meetings = clearDuplicateMeetings(meetings)
 
 	return meetings, nil
+}
+
+func dateFormat(t time.Time) string {
+	y, m, d := t.Date()
+	return fmt.Sprintf("%04d-%02d-%02d", y, int(m), d)
+}
+
+type meetingsChan struct {
+	meetings []Meeting
+	err      error
+}
+
+func (z *ZoomClient) getMeetings(ch chan meetingsChan, endpoint *url.URL, from time.Time) {
+	z.lock()
+	defer z.unlock()
+
+	res := meetingsChan{}
+	query := endpoint.Query()
+	query.Set("page_size", "300")
+	query.Set("from", dateFormat(from))
+	query.Set("to", dateFormat(from.AddDate(0, 1, 0)))
+
+	for {
+		m, err := z.getMeeting(endpoint, query)
+		if err != nil {
+			res.err = err
+			break
+		}
+
+		res.meetings = m.Meetings
+		if m.NextPageToken == "" {
+			break
+		}
+
+		query.Set("next_page_token", m.NextPageToken)
+	}
+
+	query.Del("next_page_token")
+	endpoint.RawQuery = query.Encode()
+
+	ch <- res
 }
 
 func (z *ZoomClient) getMeeting(endpoint *url.URL, queries url.Values) (ListAllRecordsResponse, error) {
@@ -183,7 +237,6 @@ func (z *ZoomClient) getMeeting(endpoint *url.URL, queries url.Values) (ListAllR
 	defer res.Body.Close()
 
 	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
-		log.Printf("error decoding listRecordings body: %s", res.Body)
 		return r, err
 	}
 
@@ -252,7 +305,7 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 		return "", err
 	}
 
-	ch := make(chan error, z.config.Concurrency)
+	ch := make(chan error)
 	chunckSize := 1024 * 1024 * z.config.ChunckSizeMB
 
 	runs := 0
@@ -273,10 +326,15 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 		}
 	}
 
+	close(ch)
+
 	return filepath, err
 }
 
 func (z *ZoomClient) downloadChunck(chErr chan error, url string, wr io.WriterAt, from, until int) {
+	z.lock()
+	defer z.unlock()
+
 	res, err := z.do(http.MethodGet, url, nil, func(r *http.Request) {
 		r.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", from, until))
 	})
@@ -294,6 +352,7 @@ func (z *ZoomClient) downloadChunck(chErr chan error, url string, wr io.WriterAt
 
 	_, err = wr.WriteAt(buf.Bytes(), int64(from))
 	chErr <- err
+	buf.Reset()
 }
 
 func (z *ZoomClient) downloadSize(url string) (int, error) {
