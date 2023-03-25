@@ -158,7 +158,7 @@ func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 
 	meetings := []Meeting{}
 
-	ch := make(chan meetingsChan)
+	ch := make(chan meetingsChan, z.config.Concurrency)
 	count := 0
 
 	endpointURL := z.BaseURL.JoinPath("users/me/recordings")
@@ -401,7 +401,7 @@ func (z *ZoomClient) Sweep() error {
 
 	for _, meeting := range meetings {
 		if ignoredTitles != "" && strings.Contains(ignoredTitles, meeting.Topic) {
-			continue
+			goto CLEANUP
 		}
 
 		for _, rf := range meeting.RecordingFiles {
@@ -425,7 +425,9 @@ func (z *ZoomClient) Sweep() error {
 			})
 		}
 
+	CLEANUP:
 		if z.config.DeleteAfter {
+			log.Printf("Deleting '%s' from %v", meeting.Topic, meeting.StartTime)
 			if err := z.DeleteRecording(meeting.UUID); err != nil {
 				return err
 			}

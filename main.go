@@ -50,11 +50,13 @@ func main() {
 
 	log.Printf("starting service with allowed recording types %v and ignored titles %v", config.RecordingTypes, config.IgnoreTitles)
 	for {
+		wait := config.Duration
 		if err := zc.Sweep(); err != nil {
 			log.Printf("error during sweep: %s", err)
+			wait = time.Second * 5
 		}
 
-		time.Sleep(config.Duration)
+		time.Sleep(wait)
 	}
 }
 
