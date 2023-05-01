@@ -164,8 +164,9 @@ func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 	endpointURL := z.BaseURL.JoinPath("users/me/recordings")
 	from := time.Date(z.config.StartingFromYear, 1, 1, 0, 0, 0, 0, time.Local)
 	now := time.Now()
-	for d := from; !d.After(now); d = d.AddDate(0, 1, 0) {
+	for d := now; !d.Before(from); d = d.AddDate(0, -1, 0) {
 		go z.getMeetings(ch, endpointURL, d)
+		log.Printf("debug: %v", d)
 		count++
 	}
 
@@ -202,8 +203,8 @@ func (z *ZoomClient) getMeetings(ch chan meetingsChan, endpoint *url.URL, from t
 	res := meetingsChan{}
 	query := endpoint.Query()
 	query.Set("page_size", "300")
-	query.Set("from", dateFormat(from))
-	query.Set("to", dateFormat(from.AddDate(0, 1, 0)))
+	query.Set("from", dateFormat(from.AddDate(0, -1, 0)))
+	query.Set("to", dateFormat(from))
 
 	for {
 		m, err := z.getMeeting(endpoint, query)
