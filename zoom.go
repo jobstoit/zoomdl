@@ -166,7 +166,6 @@ func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 	now := time.Now()
 	for d := now; !d.Before(from); d = d.AddDate(0, -1, 0) {
 		go z.getMeetings(ch, endpointURL, d)
-		log.Printf("debug: %v", d)
 		count++
 	}
 
