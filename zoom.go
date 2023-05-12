@@ -363,7 +363,9 @@ func (z *ZoomClient) downloadSize(url string) (int, error) {
 	defer res.Body.Close() //nolint: errcheck
 
 	slen := res.Header.Get("Content-Length")
-	return strconv.Atoi(slen)
+	i, _ := strconv.Atoi(slen) //nolint: errcheck
+
+	return i
 }
 
 // RecordHolder holds stores the saved records
