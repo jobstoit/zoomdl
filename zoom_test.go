@@ -80,8 +80,8 @@ func TestDeleteRecording(t *testing.T) {
 	c := SetupTest("tmp_test_delete")
 	defer os.RemoveAll(c.config.Directory)
 
-	assert(t, c.DeleteRecording("1001") == nil, "deletion doesnt return an error")
-	assert(t, c.DeleteRecording("1001") != nil, "deletion returns an error")
+	assert(t, c.DeleteRecording(1001) == nil, "deletion doesnt return an error")
+	assert(t, c.DeleteRecording(1001) != nil, "deletion returns an error")
 }
 
 func assertFileExists(t *testing.T, fpath string) {

@@ -260,8 +260,8 @@ func clearDuplicateMeetings(ms []Meeting) []Meeting {
 }
 
 // DeleteRecording deletes the recording on zoom
-func (z *ZoomClient) DeleteRecording(id string) error {
-	url := z.BaseURL.JoinPath("meetings", id, "recordings").String()
+func (z *ZoomClient) DeleteRecording(id int) error {
+	url := z.BaseURL.JoinPath("meetings", strconv.Itoa(id), "recordings").String()
 
 	res, err := z.do(http.MethodDelete, url, &bytes.Buffer{})
 	if err != nil {
@@ -428,7 +428,7 @@ func (z *ZoomClient) Sweep() error {
 	CLEANUP:
 		if z.config.DeleteAfter {
 			log.Printf("Deleting '%s' from %v", meeting.Topic, meeting.StartTime)
-			if err := z.DeleteRecording(meeting.UUID); err != nil {
+			if err := z.DeleteRecording(meeting.ID); err != nil {
 				return err
 			}
 		}
