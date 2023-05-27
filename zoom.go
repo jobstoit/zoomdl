@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +17,8 @@ import (
 	"strings"
 	"time"
 )
+
+const API_CALL_CONCURRENCY_LIMIT = 2
 
 const (
 	RecordingTypeScharedScreenWithSpeakerCC RecordingType = "shared_screen_with_speaker_view(CC)"
@@ -70,6 +74,7 @@ type ZoomClient struct {
 	cli     *http.Client
 	token   *AccessToken
 	mut     chan bool
+	context context.Context
 }
 
 func (z *ZoomClient) lock() {
@@ -120,7 +125,6 @@ func (z *ZoomClient) Authorize() (*AccessToken, error) {
 
 	bearer := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", z.config.ClientID, z.config.ClientSecret)))
 	req.Header.Add(`Authorization`, fmt.Sprintf("Basic %s", bearer))
-	req.Header.Add(`Host`, "zoom.us")
 	req.Header.Add(`Content-Type`, "application/x-www-form-urlencoded")
 
 	res, err := z.cli.Do(req)
@@ -158,7 +162,12 @@ func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 
 	meetings := []Meeting{}
 
-	ch := make(chan meetingsChan, z.config.Concurrency)
+	concurrency := z.config.Concurrency
+	if concurrency > API_CALL_CONCURRENCY_LIMIT {
+		concurrency = API_CALL_CONCURRENCY_LIMIT
+	}
+
+	ch := make(chan meetingsChan, concurrency)
 	count := 0
 
 	endpointURL := z.BaseURL.JoinPath("users/me/recordings")
@@ -300,16 +309,13 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 	}
 	defer file.Close() // nolint: errcheck
 
-	size, err := z.downloadSize(rec.DownloadURL)
-	if err != nil {
-		return "", err
-	}
+	size := z.downloadSize(rec.DownloadURL)
 
 	ch := make(chan error)
 	chunckSize := 1024 * 1024 * z.config.ChunckSizeMB
 
 	runs := 0
-	for i := 0; i < size; i += chunckSize {
+	for i := 0; i <= size; i += chunckSize {
 		until := i + chunckSize
 		if until > size {
 			until = size
@@ -322,6 +328,11 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 	for i := 0; i < runs; i++ {
 		err := <-ch
 		if err != nil {
+			_ = file.Close()
+			_ = os.Remove(filepath)
+
+			close(ch)
+
 			return "", err
 		}
 	}
@@ -336,7 +347,9 @@ func (z *ZoomClient) downloadChunck(chErr chan error, url string, wr io.WriterAt
 	defer z.unlock()
 
 	res, err := z.do(http.MethodGet, url, nil, func(r *http.Request) {
-		r.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", from, until))
+		if until > 0 {
+			r.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", from, until))
+		}
 	})
 	if err != nil {
 		chErr <- err
@@ -355,15 +368,14 @@ func (z *ZoomClient) downloadChunck(chErr chan error, url string, wr io.WriterAt
 	buf.Reset()
 }
 
-func (z *ZoomClient) downloadSize(url string) (int, error) {
+func (z *ZoomClient) downloadSize(url string) int {
 	res, err := z.do(http.MethodHead, url, nil)
 	if err != nil {
-		return 0, err
+		return 0
 	}
 	defer res.Body.Close() //nolint: errcheck
 
-	slen := res.Header.Get("Content-Length")
-	return strconv.Atoi(slen)
+	return int(res.ContentLength)
 }
 
 // RecordHolder holds stores the saved records
@@ -373,6 +385,10 @@ type RecordHolder struct {
 
 // Sweep will get all the records and download the specified files
 func (z *ZoomClient) Sweep() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	z.context = ctx
+	defer cancel()
+
 	recFileName := path.Join(z.config.Directory, SavedRecordFileName)
 	fbody, err := os.ReadFile(recFileName)
 	if err != nil {
@@ -399,6 +415,7 @@ func (z *ZoomClient) Sweep() error {
 	allowedTypes := strings.Join(z.config.RecordingTypes, " ")
 	ignoredTitles := strings.Join(z.config.IgnoreTitles, " ")
 
+	var errs error
 	for _, meeting := range meetings {
 		if ignoredTitles != "" && strings.Contains(ignoredTitles, meeting.Topic) {
 			goto CLEANUP
@@ -413,7 +430,8 @@ func (z *ZoomClient) Sweep() error {
 			log.Printf("Downloading '%s' from %v of type %s", meeting.Topic, rf.RecordingStart, rf.RecordingType)
 			filePath, err := z.DownloadVideo(meeting.Topic, rf)
 			if err != nil {
-				return err
+				errs = errors.Join(errs, err)
+				continue
 			}
 
 			records.Records = append(records.Records, SavedRecord{
@@ -429,13 +447,13 @@ func (z *ZoomClient) Sweep() error {
 		if z.config.DeleteAfter {
 			log.Printf("Deleting '%s' from %v", meeting.Topic, meeting.StartTime)
 			if err := z.DeleteRecording(meeting.ID); err != nil {
-				return err
+				errs = errors.Join(errs, err)
 			}
 		}
 	}
 	log.Print(`finished fetching recordings`)
 
-	return nil
+	return errs
 }
 
 func saveRecords(records *RecordHolder, filename string) {
@@ -464,9 +482,9 @@ func (z *ZoomClient) do(method, url string, body io.Reader, opts ...func(*http.R
 		log.Print(`error creating request`)
 		return nil, err
 	}
+	req = req.WithContext(z.context)
 
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", z.token.AccessToken))
-	req.Header.Add("Host", `api.zoom.us`)
 
 	for _, opt := range opts {
 		opt(req)

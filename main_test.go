@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -24,13 +25,17 @@ func SetupTest(dir string) *ZoomClient {
 
 	createSaveFile(dir)
 
-	return NewZoomClient(&Config{
+	cli := NewZoomClient(&Config{
 		APIEndpoint:  endpointURL,
 		AuthEndpoint: endpointURL,
 		Directory:    dir,
 		Concurrency:  2,
 		ChunckSizeMB: 4,
 	})
+
+	cli.context = context.Background()
+
+	return cli
 }
 
 // ZoomMockAPI mocks the zoom api for testing
