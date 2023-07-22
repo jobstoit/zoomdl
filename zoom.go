@@ -422,7 +422,9 @@ func (z *ZoomClient) Sweep() error {
 		}
 
 		for _, rf := range meeting.RecordingFiles {
-			if strings.Contains(recordIDs, rf.ID) ||
+			if rf.FileExtension == "" ||
+				string(rf.RecordingType) == "" ||
+				strings.Contains(recordIDs, rf.ID) ||
 				!strings.Contains(allowedTypes, string(rf.RecordingType)) {
 				continue
 			}
