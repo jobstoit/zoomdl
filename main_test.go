@@ -69,6 +69,7 @@ func (z *ZoomMockAPI) Seed() {
 		createMeeting(z.baseURL, `static2`, 1004, time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC), RecordingTypeGallery, RecordingTypeActiveSpeaker),
 		createMeeting(z.baseURL, `ignore`, 1005, time.Date(2023, time.January, 2, 0, 0, 0, 0, time.UTC), RecordingTypeGallery, RecordingTypeActiveSpeaker),
 		createMeeting(z.baseURL, `ignore`, 1005, time.Date(2023, time.January, 2, 0, 0, 0, 0, time.UTC), RecordingTypeGallery, RecordingTypeActiveSpeaker),
+		createMeeting(z.baseURL, `ignore`, 1005, time.Date(2023, time.January, 2, 0, 0, 0, 0, time.UTC), RecordingType("")),
 	}
 
 	for i := 0; i < 10; i++ {

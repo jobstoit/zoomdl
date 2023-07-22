@@ -1,9 +1,9 @@
 package main
 
 import (
-	"io/fs"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 )
@@ -74,6 +74,7 @@ func TestSweep(t *testing.T) {
 	assertFileExists(t, path.Join(c.config.Directory, "static/2022-11-01_00-00-00_active_speaker.mp4"))
 	assertFileExists(t, path.Join(c.config.Directory, "static/2022-11-01_00-00-00_gallery_view.mp4"))
 	assertFileExists(t, path.Join(c.config.Directory, "static2/2023-01-01_00-00-00_active_speaker.mp4"))
+	assertFileNotExists(t, path.Join(c.config.Directory, "ignore/2023-01-02_00-00-00_.mp4"))
 }
 
 func TestDeleteRecording(t *testing.T) {
@@ -86,7 +87,14 @@ func TestDeleteRecording(t *testing.T) {
 
 func assertFileExists(t *testing.T, fpath string) {
 	_, err := os.Stat(fpath)
-	if err != nil && err != fs.ErrNotExist {
+	if err != nil {
 		t.Errorf("missing expected file %s", fpath)
+	}
+}
+
+func assertFileNotExists(t *testing.T, fpath string) {
+	_, err := os.Stat(fpath)
+	if !strings.HasSuffix(err.Error(), "no such file or directory") {
+		t.Errorf("unexpected file %s, err: %v", fpath, err)
 	}
 }
