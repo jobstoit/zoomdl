@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jobstoit/httpio"
 )
 
 const API_CALL_CONCURRENCY_LIMIT = 2
@@ -160,8 +162,6 @@ func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 		z.token = at
 	}
 
-	meetings := []Meeting{}
-
 	concurrency := z.config.Concurrency
 	if concurrency > API_CALL_CONCURRENCY_LIMIT {
 		concurrency = API_CALL_CONCURRENCY_LIMIT
@@ -173,10 +173,13 @@ func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 	endpointURL := z.BaseURL.JoinPath("users/me/recordings")
 	from := time.Date(z.config.StartingFromYear, 1, 1, 0, 0, 0, 0, time.Local)
 	now := time.Now()
+
 	for d := now; !d.Before(from); d = d.AddDate(0, -1, 0) {
 		go z.getMeetings(ch, endpointURL, d)
 		count++
 	}
+
+	meetings := []Meeting{}
 
 	for i := 0; i < count; i++ {
 		res := <-ch
@@ -309,73 +312,32 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 	}
 	defer file.Close() // nolint: errcheck
 
-	size := z.downloadSize(rec.DownloadURL)
-
-	ch := make(chan error)
-	chunckSize := 1024 * 1024 * z.config.ChunckSizeMB
-
-	runs := 0
-	for i := 0; i <= size; i += chunckSize {
-		until := i + chunckSize
-		if until > size {
-			until = size
-		}
-
-		go z.downloadChunck(ch, rec.DownloadURL, file, i, until)
-		runs++
-	}
-
-	for i := 0; i < runs; i++ {
-		err := <-ch
+	if z.token == nil || time.Now().After(z.token.ExpiresAt) {
+		at, err := z.Authorize()
 		if err != nil {
-			_ = file.Close()
-			_ = os.Remove(filepath)
-
-			close(ch)
-
 			return "", err
 		}
+		z.token = at
 	}
 
-	close(ch)
+	remoteFile, err := httpio.Get(
+		rec.DownloadURL,
+		httpio.WithClient(z.cli),
+		httpio.WithChunkSize(1024*1024*z.config.ChunckSizeMB),
+		httpio.WithConcurrency(z.config.Concurrency),
+		httpio.WithHeader("Authorization", fmt.Sprintf("Bearer %s", z.token.AccessToken)),
+	)
+	if err != nil {
+		log.Printf("error fetching data: %v", err)
+		return "", err
+	}
+
+	if _, err := io.Copy(file, remoteFile); err != nil {
+		log.Printf("error writing data: %v", err)
+		return "", err
+	}
 
 	return filepath, err
-}
-
-func (z *ZoomClient) downloadChunck(chErr chan error, url string, wr io.WriterAt, from, until int) {
-	z.lock()
-	defer z.unlock()
-
-	res, err := z.do(http.MethodGet, url, nil, func(r *http.Request) {
-		if until > 0 {
-			r.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", from, until))
-		}
-	})
-	if err != nil {
-		chErr <- err
-		return
-	}
-	defer res.Body.Close() //nolint: errcheck
-
-	buf := &bytes.Buffer{}
-	if _, err := buf.ReadFrom(res.Body); err != nil {
-		chErr <- err
-		return
-	}
-
-	_, err = wr.WriteAt(buf.Bytes(), int64(from))
-	chErr <- err
-	buf.Reset()
-}
-
-func (z *ZoomClient) downloadSize(url string) int {
-	res, err := z.do(http.MethodHead, url, nil)
-	if err != nil {
-		return 0
-	}
-	defer res.Body.Close() //nolint: errcheck
-
-	return int(res.ContentLength)
 }
 
 // RecordHolder holds stores the saved records
