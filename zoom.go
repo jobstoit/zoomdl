@@ -340,42 +340,6 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 	return filepath, err
 }
 
-func (z *ZoomClient) downloadChunck(chErr chan error, url string, wr io.WriterAt, from, until int) {
-	z.lock()
-	defer z.unlock()
-
-	res, err := z.do(http.MethodGet, url, nil, func(r *http.Request) {
-		if until > 0 {
-			r.Header.Add("Range", fmt.Sprintf("bytes=%d-%d", from, until))
-		}
-	})
-	if err != nil {
-		chErr <- err
-		return
-	}
-	defer res.Body.Close() //nolint: errcheck
-
-	buf := &bytes.Buffer{}
-	if _, err := buf.ReadFrom(res.Body); err != nil {
-		chErr <- err
-		return
-	}
-
-	_, err = wr.WriteAt(buf.Bytes(), int64(from))
-	chErr <- err
-	buf.Reset()
-}
-
-func (z *ZoomClient) downloadSize(url string) int {
-	res, err := z.do(http.MethodHead, url, nil)
-	if err != nil {
-		return 0
-	}
-	defer res.Body.Close() //nolint: errcheck
-
-	return int(res.ContentLength)
-}
-
 // RecordHolder holds stores the saved records
 type RecordHolder struct {
 	Records []SavedRecord
