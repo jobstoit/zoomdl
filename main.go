@@ -71,7 +71,6 @@ func createSaveFile(dir string) {
 		}
 		_ = file.Close()
 	}
-
 }
 
 // NewConfig returns a new initialized config
