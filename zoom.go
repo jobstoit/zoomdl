@@ -355,7 +355,7 @@ func (z *ZoomClient) Sweep() error {
 
 	records := &RecordHolder{}
 	if err := json.NewDecoder(saveFile).Decode(records); err != nil && err != io.EOF {
-		return err
+		log.Printf("unable to read record file: %v", err)
 	}
 
 	defer z.saveRecords(ctx, records)
@@ -423,6 +423,11 @@ func (z *ZoomClient) saveRecords(ctx context.Context, records *RecordHolder) {
 	err = json.NewEncoder(file).Encode(records)
 	if err != nil {
 		log.Printf("error encoding file: %v", err)
+	}
+
+	err = file.Close()
+	if err != nil {
+		log.Printf("error closing file: %v", err)
 	}
 }
 

@@ -20,9 +20,13 @@ type FileSystem interface {
 type multifs []FileSystem
 
 func newMultiFS(ctx context.Context, destinations []string) (FileSystem, error) {
-	fileSystems := make(multifs, len(destinations))
+	fileSystems := make(multifs, 0, len(destinations))
 
 	for _, dst := range destinations {
+		if dst == "" {
+			continue
+		}
+
 		u, err := url.Parse(dst)
 		if err != nil {
 			return nil, err
@@ -32,12 +36,12 @@ func newMultiFS(ctx context.Context, destinations []string) (FileSystem, error) 
 		case "file":
 			fs, err := newOsFS(u.Path)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("unable to open '%s': %v", u.Path, err)
 			}
 
 			fileSystems = append(fileSystems, fs)
 		case "s3":
-			bucket, err := s3io.OpenBucket(ctx, dst)
+			bucket, err := s3io.OpenURL(ctx, dst)
 			if err != nil {
 				return nil, err
 			}
