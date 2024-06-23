@@ -48,3 +48,16 @@ $ docker run \
  -e "ZOOMDL_CLIENT_SECRET=<your-client-secret>" \
  ghcr.io/jobstoit/zoomdl:latest
 ```
+
+set destinations:
+
+```
+# local
+file:///absolute/path/to/file
+
+# s3
+s3://access-key:access-secret@host/bucketname?region=us-east
+```
+
+```
+```
