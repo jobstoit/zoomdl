@@ -58,6 +58,3 @@ file:///absolute/path/to/file
 # s3
 s3://access-key:access-secret@host/bucketname?region=us-east
 ```
-
-```
-```
