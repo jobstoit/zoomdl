@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -77,6 +76,7 @@ type ZoomClient struct {
 	token   *AccessToken
 	mut     chan bool
 	context context.Context
+	fs      FileSystem
 }
 
 func (z *ZoomClient) lock() {
@@ -98,12 +98,13 @@ type AccessToken struct {
 type ZoomClientOption func(*ZoomClient) error
 
 // NewZoomClient creates a new instance of the zoom client
-func NewZoomClient(cfg *Config) *ZoomClient {
+func NewZoomClient(cfg *Config, fs FileSystem) *ZoomClient {
 	z := &ZoomClient{}
 	z.config = cfg
 	z.cli = &http.Client{}
 	z.BaseURL = z.config.APIEndpoint
 	z.mut = make(chan bool, cfg.Concurrency)
+	z.fs = fs
 
 	return z
 }
@@ -291,7 +292,7 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 	sessionTitle = serializPathString(sessionTitle)
 	fileExtention := strings.ToLower(rec.FileExtension)
 
-	filepath := path.Join(z.config.Directory, sessionTitle, fmt.Sprintf("%04d-%02d-%02d_%02d-%02d-%02d_%s.%s",
+	target := path.Join(sessionTitle, fmt.Sprintf("%04d-%02d-%02d_%02d-%02d-%02d_%s.%s",
 		rec.RecordingStart.Year(),
 		int(recordingTime.Month()),
 		recordingTime.Day(),
@@ -302,11 +303,7 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 		fileExtention,
 	))
 
-	if err := os.MkdirAll(path.Dir(filepath), os.ModePerm); err != nil && err != os.ErrExist {
-		return ``, err
-	}
-
-	file, err := os.OpenFile(filepath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	file, err := z.fs.Writer(z.context, target)
 	if err != nil {
 		return "", err
 	}
@@ -337,7 +334,7 @@ func (z *ZoomClient) DownloadVideo(sessionTitle string, rec RecordingFile) (stri
 		return "", err
 	}
 
-	return filepath, err
+	return target, err
 }
 
 // RecordHolder holds stores the saved records
@@ -351,20 +348,17 @@ func (z *ZoomClient) Sweep() error {
 	z.context = ctx
 	defer cancel()
 
-	recFileName := path.Join(z.config.Directory, SavedRecordFileName)
-	fbody, err := os.ReadFile(recFileName)
+	saveFile, err := z.fs.Reader(z.context, SavedRecordFileName)
 	if err != nil {
 		return err
 	}
 
 	records := &RecordHolder{}
-	if len(fbody) > 0 {
-		if err := json.Unmarshal(fbody, &records.Records); err != nil && err != io.EOF {
-			return err
-		}
+	if err := json.NewDecoder(saveFile).Decode(records); err != nil && err != io.EOF {
+		return err
 	}
 
-	defer saveRecords(records, recFileName)
+	defer z.saveRecords(ctx, records)
 
 	log.Print(`pulling recordings`)
 	meetings, err := z.ListAllRecordings()
@@ -420,15 +414,15 @@ func (z *ZoomClient) Sweep() error {
 	return errs
 }
 
-func saveRecords(records *RecordHolder, filename string) {
-	fbody, err := json.Marshal(records.Records)
+func (z *ZoomClient) saveRecords(ctx context.Context, records *RecordHolder) {
+	file, err := z.fs.Writer(ctx, SavedRecordFileName)
 	if err != nil {
-		log.Print(`unable to marshal saved records`)
-		return
+		log.Printf("error opening writer for saving file: %v", err)
 	}
 
-	if err := os.WriteFile(filename, fbody, 0644); err != nil {
-		log.Print(`unable to save saved records`)
+	err = json.NewEncoder(file).Encode(records)
+	if err != nil {
+		log.Printf("error encoding file: %v", err)
 	}
 }
 
