@@ -1,10 +1,11 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -18,9 +19,9 @@ const (
 type Config struct {
 	RecordingTypes   []string
 	IgnoreTitles     []string
+	Destinations     []string
 	DeleteAfter      bool
 	Duration         time.Duration
-	Directory        string
 	Token            string
 	APIEndpoint      *url.URL
 	AuthEndpoint     *url.URL
@@ -44,9 +45,12 @@ type SavedRecord struct {
 
 func main() {
 	config := NewConfig()
-	zc := NewZoomClient(config)
+	fs, err := newMultiFS(context.Background(), config.Destinations)
+	if err != nil {
+		log.Fatalf("error opening destinations: %v", err)
+	}
 
-	createSaveFile(zc.config.Directory)
+	zc := NewZoomClient(config, fs)
 
 	log.Printf("starting service with allowed recording types %v and ignored titles %v", config.RecordingTypes, config.IgnoreTitles)
 	for {
@@ -60,19 +64,6 @@ func main() {
 	}
 }
 
-func createSaveFile(dir string) {
-	_ = os.MkdirAll(dir, os.ModePerm)
-
-	p := path.Join(dir, SavedRecordFileName)
-	if _, err := os.Stat(p); os.IsNotExist(err) {
-		file, err := os.Create(p)
-		if err != nil {
-			log.Fatal("error creating save file")
-		}
-		_ = file.Close()
-	}
-}
-
 // NewConfig returns a new initialized config
 func NewConfig() *Config {
 	c := &Config{}
@@ -80,7 +71,10 @@ func NewConfig() *Config {
 	c.RecordingTypes = strings.Split(os.Getenv("ZOOMDL_RECORDING_TYPES"), ";")
 	c.IgnoreTitles = strings.Split(os.Getenv("ZOOMDL_IGNORE_TITLES"), ";")
 
-	c.Directory = envDefault("ZOOMDL_DIR", "/")
+	c.Destinations = strings.Split(os.Getenv("ZOOMDL_DESTINATIONS"), ";")
+	if dir := os.Getenv("ZOOMDL_DIR"); dir != "" { // backwards compatibility
+		c.Destinations = append(c.Destinations, fmt.Sprintf("file://%s", dir))
+	}
 
 	c.UserID = envRequired("ZOOMDL_USER_ID")
 	c.ClientID = envRequired("ZOOMDL_CLIENT_ID")

@@ -9,13 +9,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
 )
 
 // SetupTest sets up the tests
-func SetupTest(dir string) *ZoomClient {
+func SetupTest(t *testing.T, dir string) *ZoomClient {
+	t.Helper()
+
 	mock := NewZoomMockAPI()
 	server := httptest.NewServer(mock)
 	endpointURL, _ := url.Parse(server.URL) //nolint: errcheck
@@ -23,17 +26,24 @@ func SetupTest(dir string) *ZoomClient {
 	mock.baseURL = endpointURL
 	mock.Seed()
 
-	createSaveFile(dir)
+	fs, err := newOsFS(dir)
+	if err != nil {
+		t.Fatalf("unable to setup fs: %v", err)
+	}
 
 	cli := NewZoomClient(&Config{
 		APIEndpoint:  endpointURL,
 		AuthEndpoint: endpointURL,
-		Directory:    dir,
+		Destinations: []string{fmt.Sprintf("file://%s", dir)},
 		Concurrency:  2,
 		ChunckSizeMB: 4,
-	})
+	}, fs)
 
 	cli.context = context.Background()
+
+	t.Cleanup(func() {
+		_ = os.RemoveAll(dir)
+	})
 
 	return cli
 }
@@ -111,7 +121,6 @@ func (z *ZoomMockAPI) listAllRecordings(wr http.ResponseWriter, r *http.Request)
 		start := meet.StartTime.Unix()
 		if start > from && to < start {
 			res.Meetings = append(res.Meetings, meet)
-
 		}
 	}
 
@@ -235,7 +244,7 @@ func randdate(from, to time.Time) time.Time {
 }
 
 func randomString(n int) string {
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 	s := make([]rune, n)
 	for i := range s {

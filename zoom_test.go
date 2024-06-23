@@ -9,8 +9,8 @@ import (
 )
 
 func TestListAllRecordings(t *testing.T) {
-	c := SetupTest("tmp_list_all_recordings")
-	defer os.RemoveAll(c.config.Directory) //nolint: errcheck
+	dir := "tmp_list_all_recordings"
+	c := SetupTest(t, dir)
 
 	c.config.StartingFromYear = 2017
 
@@ -36,8 +36,8 @@ func TestListAllRecordings(t *testing.T) {
 }
 
 func TestDownload(t *testing.T) {
-	c := SetupTest("tmp_test_download")
-	defer os.RemoveAll(c.config.Directory) //nolint: errcheck
+	dir := "tmp_test_download"
+	c := SetupTest(t, dir)
 
 	fpath, err := c.DownloadVideo("static", RecordingFile{
 		RecordingType:  RecordingTypeActiveSpeaker,
@@ -48,11 +48,11 @@ func TestDownload(t *testing.T) {
 
 	assert(t, err == nil, "error must be nil")
 	assert(t,
-		path.Join(c.config.Directory, "/static/2018-01-01_00-00-00_active_speaker.mp4") == fpath,
+		path.Join("static/2018-01-01_00-00-00_active_speaker.mp4") == fpath,
 		"path must be equal",
 	)
 
-	stat, err := os.Stat(fpath)
+	stat, err := os.Stat(path.Join(dir, fpath))
 	assert(t, err == nil, "getting file stat error must be nil")
 	if stat != nil {
 		assert(t, stat.Size() > 0, "downloaded filesize must be bigger than zero")
@@ -60,26 +60,32 @@ func TestDownload(t *testing.T) {
 }
 
 func TestSweep(t *testing.T) {
-	c := SetupTest("tmp_test_sweep")
-	defer os.RemoveAll(c.config.Directory) //nolint: errcheck
+	dir := "tmp_test_sweep"
+	c := SetupTest(t, dir)
 
-	c.config.RecordingTypes = []string{string(RecordingTypeActiveSpeaker), string(RecordingTypeGallery), string(RecordingTypeGallery), string(RecordingTypeSpeaker)}
+	c.config.RecordingTypes = []string{
+		string(RecordingTypeActiveSpeaker),
+		string(RecordingTypeGallery),
+		string(RecordingTypeGallery),
+		string(RecordingTypeSpeaker),
+	}
 	c.config.IgnoreTitles = []string{"ignore"}
 	c.config.StartingFromYear = 2022
 
-	assert(t, c.Sweep() == nil, "sweep error mustbe nil")
+	if err := c.Sweep(); err != nil {
+		t.Fatalf("unexpected error during sweep: %v", err)
+	}
 
-	assertFileExists(t, path.Join(c.config.Directory, "static/2022-10-01_00-00-00_gallery_view.mp4"))
-	assertFileExists(t, path.Join(c.config.Directory, "static/2022-10-01_00-00-00_active_speaker.mp4"))
-	assertFileExists(t, path.Join(c.config.Directory, "static/2022-11-01_00-00-00_active_speaker.mp4"))
-	assertFileExists(t, path.Join(c.config.Directory, "static/2022-11-01_00-00-00_gallery_view.mp4"))
-	assertFileExists(t, path.Join(c.config.Directory, "static2/2023-01-01_00-00-00_active_speaker.mp4"))
-	assertFileNotExists(t, path.Join(c.config.Directory, "ignore/2023-01-02_00-00-00_.mp4"))
+	assertFileExists(t, path.Join(dir, "static/2022-10-01_00-00-00_gallery_view.mp4"))
+	assertFileExists(t, path.Join(dir, "static/2022-10-01_00-00-00_active_speaker.mp4"))
+	assertFileExists(t, path.Join(dir, "static/2022-11-01_00-00-00_active_speaker.mp4"))
+	assertFileExists(t, path.Join(dir, "static/2022-11-01_00-00-00_gallery_view.mp4"))
+	assertFileExists(t, path.Join(dir, "static2/2023-01-01_00-00-00_active_speaker.mp4"))
+	assertFileNotExists(t, path.Join(dir, "ignore/2023-01-02_00-00-00_.mp4"))
 }
 
 func TestDeleteRecording(t *testing.T) {
-	c := SetupTest("tmp_test_delete")
-	defer os.RemoveAll(c.config.Directory)
+	c := SetupTest(t, "tmp_test_delete")
 
 	assert(t, c.DeleteRecording(1001) == nil, "deletion doesnt return an error")
 	assert(t, c.DeleteRecording(1001) != nil, "deletion returns an error")
