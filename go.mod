@@ -4,7 +4,7 @@ go 1.22.4
 
 require (
 	github.com/jobstoit/httpio v1.0.0
-	github.com/jobstoit/s3io/v2 v2.4.3
+	github.com/jobstoit/s3io/v2 v2.5.0
 )
 
 require (

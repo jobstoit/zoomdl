@@ -38,5 +38,5 @@ github.com/aws/smithy-go v1.20.3 h1:ryHwveWzPV5BIof6fyDvor6V3iUL7nTfiTKXHiW05nE=
 github.com/aws/smithy-go v1.20.3/go.mod h1:krry+ya/rV9RDcV/Q16kpu6ypI4K2czasz0NC3qS14E=
 github.com/jobstoit/httpio v1.0.0 h1:Noda+tFMRpXSRsjzPRiDbRv9HWGiERWOLgl1phOF8fc=
 github.com/jobstoit/httpio v1.0.0/go.mod h1:oPe+pgx+fp9LinK+K8YyQAoiP4aXnHrBvwsTxE9pSZ0=
-github.com/jobstoit/s3io/v2 v2.4.3 h1:aQ3L2bO8Ye4APaSCRQ7cZOd8x9hHlIu5IFP5N1rId84=
-github.com/jobstoit/s3io/v2 v2.4.3/go.mod h1:Ur8icgi8dqEQ00rBUqWwuA8BeSICurUzkLh//dDoyz4=
+github.com/jobstoit/s3io/v2 v2.5.0 h1:7VFa7n43jdLpYNEoe4wPBpzz6K7h/jSKtSQs4Wk4ETA=
+github.com/jobstoit/s3io/v2 v2.5.0/go.mod h1:Ur8icgi8dqEQ00rBUqWwuA8BeSICurUzkLh//dDoyz4=
