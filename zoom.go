@@ -154,7 +154,7 @@ func (z *ZoomClient) Authorize() (*AccessToken, error) {
 }
 
 // ListAllRecordings returns all recordings
-func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
+func (z *ZoomClient) ListAllRecordings(from time.Time) ([]Meeting, error) {
 	if z.token == nil || time.Now().After(z.token.ExpiresAt) {
 		at, err := z.Authorize()
 		if err != nil {
@@ -172,7 +172,9 @@ func (z *ZoomClient) ListAllRecordings() ([]Meeting, error) {
 	count := 0
 
 	endpointURL := z.BaseURL.JoinPath("users/me/recordings")
-	from := time.Date(z.config.StartingFromYear, 1, 1, 0, 0, 0, 0, time.Local)
+	if from.IsZero() {
+		from = time.Date(z.config.StartingFromYear, 1, 1, 0, 0, 0, 0, time.Local)
+	}
 	now := time.Now()
 
 	for d := now; !d.Before(from); d = d.AddDate(0, -1, 0) {
@@ -360,8 +362,10 @@ func (z *ZoomClient) Sweep() error {
 
 	defer z.saveRecords(ctx, records)
 
+	latestRecord := records.Records[len(records.Records)-1]
+
 	log.Print(`pulling recordings`)
-	meetings, err := z.ListAllRecordings()
+	meetings, err := z.ListAllRecordings(latestRecord.RecordedAt)
 	if err != nil {
 		return err
 	}

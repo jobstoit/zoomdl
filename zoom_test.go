@@ -14,7 +14,7 @@ func TestListAllRecordings(t *testing.T) {
 
 	c.config.StartingFromYear = 2017
 
-	meetings, err := c.ListAllRecordings()
+	meetings, err := c.ListAllRecordings(time.Time{})
 	assert(t, err == nil, "unexpected error listing recordings")
 	assert(t, len(meetings) > 1, "missing expected recordings")
 
