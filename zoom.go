@@ -362,10 +362,13 @@ func (z *ZoomClient) Sweep() error {
 
 	defer z.saveRecords(ctx, records)
 
-	latestRecord := records.Records[len(records.Records)-1]
+	var from time.Time
+	if len(records.Records) > 0 {
+		from = records.Records[len(records.Records)-1].RecordedAt
+	}
 
 	log.Print(`pulling recordings`)
-	meetings, err := z.ListAllRecordings(latestRecord.RecordedAt)
+	meetings, err := z.ListAllRecordings(from)
 	if err != nil {
 		return err
 	}
