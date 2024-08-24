@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"os"
 	"path"
 	"strings"
@@ -89,6 +91,66 @@ func TestDeleteRecording(t *testing.T) {
 
 	assert(t, c.DeleteRecording(1001) == nil, "deletion doesnt return an error")
 	assert(t, c.DeleteRecording(1001) != nil, "deletion returns an error")
+}
+
+func TestSaveRecords(t *testing.T) {
+	dir := "tmp_test_save"
+	c := SetupTest(t, dir)
+
+	ctx := context.Background()
+
+	c.saveRecords(ctx, &RecordHolder{
+		Records: []SavedRecord{
+			{
+				ID:         "random_id2",
+				SessionID:  "random_session_id2",
+				SavedAt:    time.Now(),
+				RecordedAt: time.Date(2022, time.September, 9, 12, 34, 0, 0, time.Local),
+				Path:       "random/random2.mp4",
+			},
+			{
+				ID:         "random_id1",
+				SessionID:  "random_session_id1",
+				SavedAt:    time.Now(),
+				RecordedAt: time.Date(2022, time.January, 1, 12, 34, 0, 0, time.Local),
+				Path:       "random/random.mp4",
+			},
+			{
+				ID:         "random_id3",
+				SessionID:  "random_session_id3",
+				SavedAt:    time.Now(),
+				RecordedAt: time.Date(2022, time.December, 5, 12, 34, 0, 0, time.Local),
+				Path:       "random/random3.mp4",
+			},
+		},
+	})
+
+	rd, err := c.fs.Reader(ctx, SavedRecordFileName)
+	if err != nil {
+		t.Fatalf("unable to read savefile: %v", err)
+	}
+
+	records := &RecordHolder{}
+	err = json.NewDecoder(rd).Decode(records)
+	if err != nil {
+		t.Fatalf("unable to marshal json: %v", err)
+	}
+
+	if e, a := 3, len(records.Records); e != a {
+		t.Fatalf("expected %d but got %d", e, a)
+	}
+
+	if e, a := "random_id1", records.Records[0].ID; e != a {
+		t.Errorf("expected %s but got %s", e, a)
+	}
+
+	if e, a := "random_id2", records.Records[1].ID; e != a {
+		t.Errorf("expected %s but got %s", e, a)
+	}
+
+	if e, a := "random_id3", records.Records[2].ID; e != a {
+		t.Errorf("expected %s but got %s", e, a)
+	}
 }
 
 func assertFileExists(t *testing.T, fpath string) {

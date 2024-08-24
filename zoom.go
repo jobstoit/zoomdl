@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -175,6 +176,7 @@ func (z *ZoomClient) ListAllRecordings(from time.Time) ([]Meeting, error) {
 	if from.IsZero() {
 		from = time.Date(z.config.StartingFromYear, 1, 1, 0, 0, 0, 0, time.Local)
 	}
+
 	now := time.Now()
 
 	for d := now; !d.Before(from); d = d.AddDate(0, -1, 0) {
@@ -426,6 +428,10 @@ func (z *ZoomClient) saveRecords(ctx context.Context, records *RecordHolder) {
 	if err != nil {
 		log.Printf("error opening writer for saving file: %v", err)
 	}
+
+	slices.SortFunc(records.Records, func(a, b SavedRecord) int {
+		return a.RecordedAt.Compare(b.RecordedAt)
+	})
 
 	err = json.NewEncoder(file).Encode(records)
 	if err != nil {
