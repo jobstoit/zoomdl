@@ -127,7 +127,7 @@ func (z *ZoomClient) Authorize() (*AccessToken, error) {
 		return nil, err
 	}
 
-	bearer := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", z.config.ClientID, z.config.ClientSecret)))
+	bearer := base64.StdEncoding.EncodeToString(fmt.Appendf([]byte{}, "%s:%s", z.config.ClientID, z.config.ClientSecret))
 	req.Header.Add(`Authorization`, fmt.Sprintf("Basic %s", bearer))
 	req.Header.Add(`Content-Type`, "application/x-www-form-urlencoded")
 
@@ -164,10 +164,7 @@ func (z *ZoomClient) ListAllRecordings(from time.Time) ([]Meeting, error) {
 		z.token = at
 	}
 
-	concurrency := z.config.Concurrency
-	if concurrency > API_CALL_CONCURRENCY_LIMIT {
-		concurrency = API_CALL_CONCURRENCY_LIMIT
-	}
+	concurrency := min(z.config.Concurrency, API_CALL_CONCURRENCY_LIMIT)
 
 	ch := make(chan meetingsChan, concurrency)
 	count := 0
@@ -186,7 +183,7 @@ func (z *ZoomClient) ListAllRecordings(from time.Time) ([]Meeting, error) {
 
 	meetings := []Meeting{}
 
-	for i := 0; i < count; i++ {
+	for range count {
 		res := <-ch
 		if res.err != nil {
 			return meetings, res.err

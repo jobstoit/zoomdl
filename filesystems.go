@@ -9,7 +9,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/jobstoit/s3io/v2"
+	"github.com/jobstoit/s3io/v3"
 )
 
 type FileSystem interface {
@@ -116,15 +116,15 @@ func (f *osfs) Reader(_ context.Context, target string) (io.Reader, error) {
 }
 
 type s3fs struct {
-	bucket *s3io.Bucket
+	bucket s3io.Bucket
 }
 
 func (f *s3fs) Writer(ctx context.Context, target string) (io.WriteCloser, error) {
-	return f.bucket.NewWriter(ctx, target), nil
+	return f.bucket.Put(ctx, target), nil
 }
 
 func (f *s3fs) Reader(ctx context.Context, target string) (io.Reader, error) {
-	return f.bucket.NewReader(ctx, target), nil
+	return f.bucket.Get(ctx, target), nil
 }
 
 type multiWriteCloser []io.WriteCloser
