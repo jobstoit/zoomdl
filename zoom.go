@@ -102,7 +102,11 @@ type ZoomClientOption func(*ZoomClient) error
 func NewZoomClient(cfg *Config, fs FileSystem) *ZoomClient {
 	z := &ZoomClient{}
 	z.config = cfg
-	z.cli = &http.Client{}
+	z.cli = &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConnsPerHost: 100000,
+		},
+	}
 	z.BaseURL = z.config.APIEndpoint
 	z.mut = make(chan bool, cfg.Concurrency)
 	z.fs = fs

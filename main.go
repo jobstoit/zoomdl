@@ -45,7 +45,7 @@ type SavedRecord struct {
 
 func main() {
 	config := NewConfig()
-	fs, err := newMultiFS(context.Background(), config.Destinations)
+	fs, err := newMultiFS(context.Background(), config)
 	if err != nil {
 		log.Fatalf("error opening destinations: %v", err)
 	}

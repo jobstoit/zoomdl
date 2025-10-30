@@ -19,7 +19,9 @@ type FileSystem interface {
 
 type multifs []FileSystem
 
-func newMultiFS(ctx context.Context, destinations []string) (FileSystem, error) {
+func newMultiFS(ctx context.Context, cfg *Config) (FileSystem, error) {
+	destinations := cfg.Destinations
+
 	fileSystems := make(multifs, 0, len(destinations))
 
 	for _, dst := range destinations {
@@ -41,7 +43,7 @@ func newMultiFS(ctx context.Context, destinations []string) (FileSystem, error) 
 
 			fileSystems = append(fileSystems, fs)
 		case "s3":
-			bucket, err := s3io.OpenURL(ctx, dst)
+			bucket, err := s3io.OpenURL(ctx, dst, s3io.WithBucketConcurrency(cfg.Concurrency))
 			if err != nil {
 				return nil, err
 			}
