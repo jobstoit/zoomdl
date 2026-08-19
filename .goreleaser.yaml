@@ -11,26 +11,26 @@ builds:
       - darwin
       - linux
 dockers_v2:
-  - images:
+  - id: linux-amd
+    images:
       - "{{ .Env.REGISTRY }}:{{ .Version }}-amd64"
       - "{{ .Env.REGISTRY }}:latest-amd64"
     dockerfile: Dockerfile.goreleaser
     platforms:
       - linux/amd64
-  - images:
+  - id: linux-arm
+    images:
       - "{{ .Env.REGISTRY }}:{{ .Version }}-arm64"
       - "{{ .Env.REGISTRY }}:latest-arm64"
     dockerfile: Dockerfile.goreleaser
     platforms:
       - linux/arm64/v8
 docker_manifests:
-  - id: linux-arm
-    name_template: "{{ .Env.REGISTRY }}:{{ .Version }}"
+  - name_template: "{{ .Env.REGISTRY }}:{{ .Version }}"
     image_templates:
       - "{{ .Env.REGISTRY }}:{{ .Version }}-amd64"
       - "{{ .Env.REGISTRY }}:{{ .Version }}-arm64"
-  - id: linux-arm
-    name_template: "{{ .Env.REGISTRY }}:latest"
+  - name_template: "{{ .Env.REGISTRY }}:latest"
     image_templates:
       - "{{ .Env.REGISTRY }}:latest-amd64"
       - "{{ .Env.REGISTRY }}:latest-arm64"
