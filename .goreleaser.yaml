@@ -24,18 +24,20 @@ dockers_v2:
     platforms:
       - linux/arm64/v8
 docker_manifests:
-  - name_template: "{{ .Env.REGISTRY }}:{{ .Version }}"
+  - id: linux-arm
+    name_template: "{{ .Env.REGISTRY }}:{{ .Version }}"
     image_templates:
       - "{{ .Env.REGISTRY }}:{{ .Version }}-amd64"
       - "{{ .Env.REGISTRY }}:{{ .Version }}-arm64"
-  - name_template: "{{ .Env.REGISTRY }}:latest"
+  - id: linux-arm
+    name_template: "{{ .Env.REGISTRY }}:latest"
     image_templates:
       - "{{ .Env.REGISTRY }}:latest-amd64"
       - "{{ .Env.REGISTRY }}:latest-arm64"
 checksum:
   name_template: "checksums.txt"
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 changelog:
   sort: asc
   filters:
