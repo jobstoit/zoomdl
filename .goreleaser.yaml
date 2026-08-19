@@ -13,27 +13,22 @@ builds:
 dockers_v2:
   - id: linux-amd
     images:
-      - "{{ .Env.REGISTRY }}:{{ .Version }}-amd64"
-      - "{{ .Env.REGISTRY }}:latest-amd64"
+      - "{{ .Env.REGISTRY }}"
+    tags:
+      - "{{ .Version }}-amd64"
+      - "latest-amd64"
     dockerfile: Dockerfile.goreleaser
     platforms:
       - linux/amd64
   - id: linux-arm
     images:
-      - "{{ .Env.REGISTRY }}:{{ .Version }}-arm64"
-      - "{{ .Env.REGISTRY }}:latest-arm64"
+      - "{{ .Env.REGISTRY }}"
+    tags:
+      - "{{ .Version }}-arm64"
+      - "latest-arm64"
     dockerfile: Dockerfile.goreleaser
     platforms:
       - linux/arm64/v8
-docker_manifests:
-  - name_template: "{{ .Env.REGISTRY }}:{{ .Version }}"
-    image_templates:
-      - "{{ .Env.REGISTRY }}:{{ .Version }}-amd64"
-      - "{{ .Env.REGISTRY }}:{{ .Version }}-arm64"
-  - name_template: "{{ .Env.REGISTRY }}:latest"
-    image_templates:
-      - "{{ .Env.REGISTRY }}:latest-amd64"
-      - "{{ .Env.REGISTRY }}:latest-arm64"
 checksum:
   name_template: "checksums.txt"
 snapshot:
