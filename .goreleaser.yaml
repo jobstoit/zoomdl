@@ -1,3 +1,4 @@
+version: 2
 before:
   hooks:
     - go mod tidy
@@ -15,20 +16,12 @@ dockers_v2:
     images:
       - "{{ .Env.REGISTRY }}"
     tags:
-      - "{{ .Version }}-amd64"
-      - "latest-amd64"
+      - "{{ .Version }}"
+      - "latest"
     dockerfile: Dockerfile.goreleaser
     platforms:
       - linux/amd64
-  - id: linux-arm
-    images:
-      - "{{ .Env.REGISTRY }}"
-    tags:
-      - "{{ .Version }}-arm64"
-      - "latest-arm64"
-    dockerfile: Dockerfile.goreleaser
-    platforms:
-      - linux/arm64/v8
+      - linux/arm64
 checksum:
   name_template: "checksums.txt"
 snapshot:
