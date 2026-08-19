@@ -489,11 +489,11 @@ func serializPathString(s string) string {
 }
 
 func getRecordMap(records []SavedRecord) string {
-	var s string
+	var s strings.Builder
 
 	for _, rec := range records {
-		s += " " + rec.ID
+		s.WriteString(" " + rec.ID)
 	}
 
-	return s
+	return s.String()
 }
