@@ -12,6 +12,6 @@ jobs:
 
       - uses: actions/checkout@v7
 
-      - uses: golangci/golangci-lint-action@v3
+      - uses: golangci/golangci-lint-action@v9
 
       - run: go test --cover ./...
