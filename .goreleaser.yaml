@@ -11,13 +11,13 @@ builds:
       - darwin
       - linux
 dockers_v2:
-  - tags:
+  - images:
       - "{{ .Env.REGISTRY }}:{{ .Version }}-amd64"
       - "{{ .Env.REGISTRY }}:latest-amd64"
     dockerfile: Dockerfile.goreleaser
     platforms:
       - linux/amd64
-  - tags:
+  - images:
       - "{{ .Env.REGISTRY }}:{{ .Version }}-arm64"
       - "{{ .Env.REGISTRY }}:latest-arm64"
     dockerfile: Dockerfile.goreleaser
