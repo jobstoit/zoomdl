@@ -252,7 +252,7 @@ func (z *ZoomClient) getMeeting(endpoint *url.URL, queries url.Values) (ListAllR
 	if err != nil {
 		return r, err
 	}
-	defer res.Body.Close()
+	defer res.Body.Close() //nolint: errcheck
 
 	if err := json.NewDecoder(res.Body).Decode(&r); err != nil {
 		return r, err
@@ -489,11 +489,11 @@ func serializPathString(s string) string {
 }
 
 func getRecordMap(records []SavedRecord) string {
-	var s string
+	var s strings.Builder
 
 	for _, rec := range records {
-		s += " " + rec.ID
+		s.WriteString(" " + rec.ID)
 	}
 
-	return s
+	return s.String()
 }

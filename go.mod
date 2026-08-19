@@ -1,8 +1,6 @@
 module github.com/jobstoit/zoomdl
 
-go 1.24
-
-toolchain go1.24.1
+go 1.26
 
 require (
 	github.com/jobstoit/httpio v1.0.0

@@ -4,28 +4,25 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
+    builder: go
     binary: zoomdl
     goos:
       - windows
       - darwin
       - linux
-dockers:
-  - image_templates:
+dockers_v2:
+  - images:
       - "{{ .Env.REGISTRY }}:{{ .Version }}-amd64"
       - "{{ .Env.REGISTRY }}:latest-amd64"
-    use: buildx
-    goarch: amd64
     dockerfile: Dockerfile.goreleaser
-    build_flag_templates:
-      - "--platform=linux/amd64"
-  - image_templates:
+    platforms:
+      - linux/amd64
+  - images:
       - "{{ .Env.REGISTRY }}:{{ .Version }}-arm64"
       - "{{ .Env.REGISTRY }}:latest-arm64"
-    use: buildx
-    goarch: arm64
     dockerfile: Dockerfile.goreleaser
-    build_flag_templates:
-      - "--platform=linux/arm64/v8"
+    platforms:
+      - linux/arm64/v8
 docker_manifests:
   - name_template: "{{ .Env.REGISTRY }}:{{ .Version }}"
     image_templates:
@@ -36,15 +33,15 @@ docker_manifests:
       - "{{ .Env.REGISTRY }}:latest-amd64"
       - "{{ .Env.REGISTRY }}:latest-arm64"
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
+      - "^docs:"
+      - "^test:"
 release:
   header: |
     ## ZoomDL release {{ .Tag }}

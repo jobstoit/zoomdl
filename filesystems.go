@@ -63,7 +63,7 @@ func (f multifs) Writer(ctx context.Context, target string) (io.WriteCloser, err
 	for _, t := range f {
 		file, err := t.Writer(ctx, target)
 		if err != nil {
-			defer writers.Close()
+			defer writers.Close() //nolint: errcheck
 
 			return nil, err
 		}
@@ -104,7 +104,7 @@ func (f *osfs) Writer(_ context.Context, target string) (io.WriteCloser, error) 
 		return nil, err
 	}
 
-	return os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	return os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 }
 
 func (f *osfs) Reader(_ context.Context, target string) (io.Reader, error) {
@@ -114,7 +114,7 @@ func (f *osfs) Reader(_ context.Context, target string) (io.Reader, error) {
 		return nil, err
 	}
 
-	return os.OpenFile(target, os.O_CREATE|os.O_RDONLY, 0644)
+	return os.OpenFile(target, os.O_CREATE|os.O_RDONLY, 0o644)
 }
 
 type s3fs struct {
